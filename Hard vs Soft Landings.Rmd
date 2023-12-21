@@ -1,0 +1,269 @@
+---
+title: "Hard vs Soft Landings"
+author: "Michael Dunphy"
+date: "2023-12-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message = FALSE}
+
+library(fredr)
+library(tidyverse)
+library(ggplot2)
+
+# set api key
+fredr_set_key('8ca8606c52bf80919eace6e0ca92858f')
+
+```
+
+```{r}
+
+# gather data
+start_date <- "1958-01-01"
+end_date <- "2023-11-01"
+
+# Federal Funds Effective Rate: https://fred.stlouisfed.org/series/FEDFUNDS
+fed_funds_rate <- fredr(
+  series_id = "FEDFUNDS",
+  observation_start = as.Date(start_date),
+  observation_end = as.Date(end_date),
+  frequency = "m", # monthly
+  units = "lin"
+)
+
+# NBER Recession Indicator: https://fred.stlouisfed.org/series/USREC
+recession_indicator <- fredr(
+  series_id = "USREC",
+  observation_start = as.Date(start_date),
+  observation_end = as.Date(end_date),
+  frequency = "m", # monthly
+  units = "lin"
+)
+
+# Unemployment Rate: https://fred.stlouisfed.org/series/UNRATE
+unemployment <- fredr(
+  series_id = "UNRATE",
+  observation_start = as.Date(start_date),
+  observation_end = as.Date(end_date),
+  frequency = "m", # monthly
+  units = "lin"
+)
+
+# Core CPI Average: https://fred.stlouisfed.org/series/CPILFESL
+core_cpi <- fredr(
+  series_id = "CPILFESL",
+  observation_start = as.Date(start_date),
+  observation_end = as.Date(end_date),
+  frequency = "m", # monthly
+  units = "pc1"
+)
+
+# Recession periods: https://fredhelp.stlouisfed.org/fred/data/understanding-the-data/recession-bars/
+recession_periods = read.table(textConnection(
+  "Peak, Trough
+  1857-06-01, 1858-12-01
+  1860-10-01, 1861-06-01
+  1865-04-01, 1867-12-01
+  1869-06-01, 1870-12-01
+  1873-10-01, 1879-03-01
+  1882-03-01, 1885-05-01
+  1887-03-01, 1888-04-01
+  1890-07-01, 1891-05-01
+  1893-01-01, 1894-06-01
+  1895-12-01, 1897-06-01
+  1899-06-01, 1900-12-01
+  1902-09-01, 1904-08-01
+  1907-05-01, 1908-06-01
+  1910-01-01, 1912-01-01
+  1913-01-01, 1914-12-01
+  1918-08-01, 1919-03-01
+  1920-01-01, 1921-07-01
+  1923-05-01, 1924-07-01
+  1926-10-01, 1927-11-01
+  1929-08-01, 1933-03-01
+  1937-05-01, 1938-06-01
+  1945-02-01, 1945-10-01
+  1948-11-01, 1949-10-01
+  1953-07-01, 1954-05-01
+  1957-08-01, 1958-04-01
+  1960-04-01, 1961-02-01
+  1969-12-01, 1970-11-01
+  1973-11-01, 1975-03-01
+  1980-01-01, 1980-07-01
+  1981-07-01, 1982-11-01
+  1990-07-01, 1991-03-01
+  2001-03-01, 2001-11-01
+  2007-12-01, 2009-06-01
+  2020-02-01, 2020-04-01"), sep=',',
+  colClasses=c('Date','Date'), header=TRUE) %>%
+  filter(Peak >= start_date) 
+
+```
+
+```{r}
+
+# process data for analysis
+process <- function(data, name) {
+  data[name] <- data$value 
+  
+  data %>%
+    select(date, all_of(name))
+}
+
+fed_funds_rate_p <- process(fed_funds_rate, 'fed_funds_rate')
+recession_indicator_p <- process(recession_indicator, 'recession_indicator')
+unemployment_p <- process(unemployment, 'unemployment')
+core_cpi_p <- process(core_cpi, 'core_cpi')
+
+```
+
+```{r}
+
+# join data
+join <- fed_funds_rate_p %>%
+  left_join(recession_indicator_p, by = c('date' = 'date')) %>%
+  left_join(unemployment_p, by = c('date' = 'date')) %>%
+  left_join(core_cpi_p, by = c('date' = 'date'))
+
+```
+
+```{r}
+
+# add analysis
+final <- join %>%
+  mutate(real_fed_rate = fed_funds_rate - core_cpi)
+
+```
+
+```{r}
+
+# visualize rates with recessions
+ggplot() +
+  geom_rect(data = recession_periods, aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = '#e5e5e5') + # Add recession shading
+  
+  geom_line(data = final, aes(x = date, y = fed_funds_rate), color = "#4361ee") +
+  
+  coord_cartesian(xlim = c(as.Date("1960-01-01"), as.Date("2026-01-01"))) +
+  ylim(0, 20) +
+  
+  labs(title = "Federal Funds Rate Over Time", 
+       subtitle = "From 1958 to 2023", 
+       y = "Fed Funds Rate", 
+       x = "", 
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, (@mtdunphy)") +
+  
+  theme_bw() +
+  
+  guides(fill = FALSE) +
+  
+  scale_x_date(breaks = seq(as.Date("1955-01-01"), as.Date("2026-01-01"), by = "5 years"), date_labels = "%Y") +
+  scale_y_continuous(breaks = seq(0, 20, by = 5)) +
+  
+  theme(text = element_text(size = 12),  # Default font size
+    plot.title = element_text(size = 16, face = "bold"),  # Font size and style for the title
+    plot.subtitle = element_text(size = 10),  # Font size for the subtitle
+    axis.title.x = element_text(size = 8),  # Font size for x-axis label
+    axis.title.y = element_text(size = 8),  # Font size for y-axis label
+    axis.text.x = element_text(size = 8),  # Font size for x-axis tick labels
+    axis.text.y = element_text(size = 8),  # Font size for y-axis tick labels
+    plot.caption = element_text(size = 8, hjust = 0),
+    
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor.x = element_blank(), 
+    panel.grid.major.y = element_line(color = "#e5e5e5", size = 0.1),
+    panel.grid.minor.y = element_line(color = "#e5e5e5", size = 0.1)) +
+  
+  annotate(geom = "text", x = max(final$date), y = tail(final$fed_funds_rate, 1), label = "5.3%", vjust = -0.5, hjust = -0.2, size = 3, color = "#4361ee", fontface = "bold")
+
+```
+
+```{r}
+
+# visualize inflation with recessions
+ggplot() +
+  geom_rect(data = recession_periods, aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = '#e5e5e5') + # Add recession shading
+  
+  geom_line(data = final, aes(x = date, y = core_cpi), color = "#c1121f") +
+  
+  coord_cartesian(xlim = c(as.Date("1960-01-01"), as.Date("2026-01-01"))) +
+  ylim(0, 20) +
+  
+  labs(title = "Core Consumer Price Index (CPI) Over Time", 
+       subtitle = "Year-over-Year Percent Change from 1958 to 2023, Excludes Food and Energy", 
+       y = "Percent Change from Year Ago", 
+       x = "", 
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, (@mtdunphy)") +
+  
+  theme_bw() +
+  
+  guides(fill = FALSE) +
+  
+  scale_x_date(breaks = seq(as.Date("1960-01-01"), as.Date("2026-01-01"), by = "5 years"), date_labels = "%Y") +
+  scale_y_continuous(breaks = seq(0, 20, by = 5)) +
+  
+  theme(text = element_text(size = 12),  # Default font size
+    plot.title = element_text(size = 16, face = "bold"),  # Font size and style for the title
+    plot.subtitle = element_text(size = 10),  # Font size for the subtitle
+    axis.title.x = element_text(size = 8),  # Font size for x-axis label
+    axis.title.y = element_text(size = 8),  # Font size for y-axis label
+    axis.text.x = element_text(size = 8),  # Font size for x-axis tick labels
+    axis.text.y = element_text(size = 8),  # Font size for y-axis tick labels
+    plot.caption = element_text(size = 8, hjust = 0),
+    
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor.x = element_blank(), 
+    panel.grid.major.y = element_line(color = "#e5e5e5", size = 0.1),
+    panel.grid.minor.y = element_line(color = "#e5e5e5", size = 0.1)) +
+  
+  annotate(geom = "text", x = max(final$date), y = tail(final$core_cpi, 1), label = "4.0%", vjust = -0.5, hjust = -0.2, size = 3, color = "#c1121f", fontface = "bold")
+
+```
+
+```{r}
+
+# visualize real federal funds rate
+ggplot() +
+  geom_rect(data = recession_periods, aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = '#e5e5e5') + # Add recession shading
+  
+  geom_hline(yintercept = 0, linetype = "solid", color = "black", size = 0.4) +  # Add a black line at y = 0
+  
+  geom_line(data = final, aes(x = date, y = real_fed_rate), color = "#7209b7") +
+  
+  coord_cartesian(xlim = c(as.Date("1960-01-01"), as.Date("2026-01-01"))) +
+  ylim(0, 20) +
+  
+  labs(title = "Real Federal Funds Rate Over Time", 
+       subtitle = "From 1958 to 2023, Fed Funds Rate Less Core CPI Average", 
+       y = "Real Federal Funds Rate", 
+       x = "", 
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, (@mtdunphy)") +
+  
+  theme_bw() +
+  
+  guides(fill = FALSE) +
+  
+  scale_x_date(breaks = seq(as.Date("1960-01-01"), as.Date("2026-01-01"), by = "5 years"), date_labels = "%Y") +
+  scale_y_continuous(breaks = seq(0, 20, by = 5)) +
+  
+  theme(text = element_text(size = 12),  # Default font size
+    plot.title = element_text(size = 16, face = "bold"),  # Font size and style for the title
+    plot.subtitle = element_text(size = 10),  # Font size for the subtitle
+    axis.title.x = element_text(size = 8),  # Font size for x-axis label
+    axis.title.y = element_text(size = 8),  # Font size for y-axis label
+    axis.text.x = element_text(size = 8),  # Font size for x-axis tick labels
+    axis.text.y = element_text(size = 8),  # Font size for y-axis tick labels
+    plot.caption = element_text(size = 8, hjust = 0),
+    
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor.x = element_blank(), 
+    panel.grid.major.y = element_line(color = "#e5e5e5", size = 0.1),
+    panel.grid.minor.y = element_line(color = "#e5e5e5", size = 0.1)) +
+      
+  annotate(geom = "text", x = max(final$date), y = tail(final$real_fed_rate, 1), label = "1.3%", vjust = -0.5, hjust = -0.2, size = 3, color = "#7209b7", fontface = "bold")
+
+```
+
