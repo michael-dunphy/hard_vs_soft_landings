@@ -24,7 +24,7 @@ fredr_set_key('8ca8606c52bf80919eace6e0ca92858f')
 
 # gather data
 start_date <- "1958-01-01"
-end_date <- "2023-11-01"
+end_date <- "2023-12-01"
 
 # Federal Funds Effective Rate: https://fred.stlouisfed.org/series/FEDFUNDS
 fed_funds_rate <- fredr(
@@ -137,6 +137,8 @@ join <- fed_funds_rate_p %>%
 final <- join %>%
   mutate(real_fed_rate = fed_funds_rate - core_cpi)
 
+write.csv(final, 'hard_vs_soft_landing.csv')
+
 ```
 
 ```{r}
@@ -154,7 +156,7 @@ ggplot() +
        subtitle = "From 1958 to 2023", 
        y = "Fed Funds Rate", 
        x = "", 
-       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, (@mtdunphy)") +
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, @mtdunphy") +
   
   theme_bw() +
   
@@ -196,7 +198,7 @@ ggplot() +
        subtitle = "Year-over-Year Percent Change from 1958 to 2023, Excludes Food and Energy", 
        y = "Percent Change from Year Ago", 
        x = "", 
-       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, (@mtdunphy)") +
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, @mtdunphy") +
   
   theme_bw() +
   
@@ -240,7 +242,7 @@ ggplot() +
        subtitle = "From 1958 to 2023, Fed Funds Rate Less Core CPI Average", 
        y = "Real Federal Funds Rate", 
        x = "", 
-       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, (@mtdunphy)") +
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, @mtdunphy") +
   
   theme_bw() +
   
@@ -264,6 +266,208 @@ ggplot() +
     panel.grid.minor.y = element_line(color = "#e5e5e5", size = 0.1)) +
       
   annotate(geom = "text", x = max(final$date), y = tail(final$real_fed_rate, 1), label = "1.3%", vjust = -0.5, hjust = -0.2, size = 3, color = "#7209b7", fontface = "bold")
+
+```
+
+```{r}
+
+# visualize unemployment rate
+ggplot() +
+  geom_rect(data = recession_periods, aes(xmin = Peak, xmax = Trough, ymin = -Inf, ymax = +Inf), fill = '#e5e5e5') + # Add recession shading
+  
+  geom_line(data = final, aes(x = date, y = unemployment), color = "#fb8500") +
+  
+  coord_cartesian(xlim = c(as.Date("1960-01-01"), as.Date("2026-01-01"))) +
+  ylim(0, 20) +
+  
+  labs(title = "Unemployment Rate Over Time", 
+       subtitle = "From 1958 to 2023", 
+       y = "Unemployment Rate", 
+       x = "", 
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, @mtdunphy") +
+  
+  theme_bw() +
+  
+  guides(fill = FALSE) +
+  
+  scale_x_date(breaks = seq(as.Date("1960-01-01"), as.Date("2026-01-01"), by = "5 years"), date_labels = "%Y") +
+  scale_y_continuous(breaks = seq(0, 20, by = 5)) +
+  
+  theme(text = element_text(size = 12),  # Default font size
+    plot.title = element_text(size = 16, face = "bold"),  # Font size and style for the title
+    plot.subtitle = element_text(size = 10),  # Font size for the subtitle
+    axis.title.x = element_text(size = 8),  # Font size for x-axis label
+    axis.title.y = element_text(size = 8),  # Font size for y-axis label
+    axis.text.x = element_text(size = 8),  # Font size for x-axis tick labels
+    axis.text.y = element_text(size = 8),  # Font size for y-axis tick labels
+    plot.caption = element_text(size = 8, hjust = 0),
+    
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor.x = element_blank(), 
+    panel.grid.major.y = element_line(color = "#e5e5e5", size = 0.1),
+    panel.grid.minor.y = element_line(color = "#e5e5e5", size = 0.1)) +
+      
+  annotate(geom = "text", x = max(final$date), y = tail(final$unemployment, 1), label = "3.7%", vjust = -0.5, hjust = -0.2, size = 3, color = "#fb8500", fontface = "bold")
+
+```
+
+```{r}
+
+# inspiration: https://www.visualcapitalist.com/comparing-the-speed-of-u-s-interest-rate-hikes/
+
+# 2022-23 Rate Hike
+a <- final %>%
+    filter(date >= "2022-02-01" & date <= "2023-08-01") %>%
+    mutate(rate_hike = "'22-'23", months_since_start = row_number() - 1, rate_increase = fed_funds_rate - first(fed_funds_rate))
+
+# 2015-18 Rate Hike
+b <- final %>%
+    filter(date >= "2015-11-01" & date <= "2019-01-01") %>%
+    mutate(rate_hike = "'15-'18", months_since_start = row_number() - 1, rate_increase = fed_funds_rate - first(fed_funds_rate))
+
+# 2004-06 Rate Hike
+c <- final %>%
+    filter(date >= "2004-05-01" & date <= "2006-07-01") %>%
+    mutate(rate_hike = "'04-'06", months_since_start = row_number() - 1, rate_increase = fed_funds_rate - first(fed_funds_rate))
+
+# 1999-00 Rate Hike
+d <- final %>%
+    filter(date >= "1999-01-01" & date <= "2000-06-01") %>%
+    mutate(rate_hike = "'99-'00", months_since_start = row_number() - 1, rate_increase = fed_funds_rate - first(fed_funds_rate))
+
+# 1994-1995 Rate Hike
+e <- final %>%
+    filter(date >= "1994-01-01" & date <= "1995-04-01") %>%
+    mutate(rate_hike = "'94-'95", months_since_start = row_number() - 1, rate_increase = fed_funds_rate - first(fed_funds_rate))
+
+# 1988-89 Rate Hike
+f <- final %>%
+    filter(date >= "1988-03-01" & date <= "1989-03-01") %>%
+    mutate(rate_hike = "'88-'89", months_since_start = row_number() - 1, rate_increase = fed_funds_rate - first(fed_funds_rate))
+
+
+rate_hikes <- a %>%
+  union(b) %>%
+  union(c) %>%
+  union(d) %>%
+  union(e) %>%
+  union(f)
+
+```
+
+```{r}
+
+# visualize change in rate hikes
+ggplot() +
+  
+  geom_line(data = rate_hikes, aes(x = months_since_start, y = rate_increase, color = rate_hike)) +
+  
+  geom_text(data = rate_hikes %>% group_by(rate_hike) %>% slice(n()), aes(x = months_since_start, y = rate_increase, color = rate_hike, label = sprintf("%s\n%.2f p.p.", rate_hike, rate_increase)), 
+            nudge_y = -0.1, vjust = -0.5, size = 3) +  # Adjust nudge_y and vjust as needed
+  
+  scale_y_continuous(limits = c(0, 6), breaks = seq(0, 6, by = 1)) +
+  
+  labs(title = "Change in Federal Funds Rate", 
+       subtitle = "Increase in Federal Fund Rate from Rate Hike Start, Among Rate Hike Cycles from 1988 to 2023", 
+       y = "Percentage Points", 
+       x = "Months Since Hiking Cycle Started", 
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, @mtdunphy") +
+  
+  theme_bw() +
+  
+  guides(color = FALSE) +
+  
+  theme(text = element_text(size = 12),  # Default font size
+    plot.title = element_text(size = 16, face = "bold"),  # Font size and style for the title
+    plot.subtitle = element_text(size = 10),  # Font size for the subtitle
+    axis.title.x = element_text(size = 8),  # Font size for x-axis label
+    axis.title.y = element_text(size = 8),  # Font size for y-axis label
+    axis.text.x = element_text(size = 8),  # Font size for x-axis tick labels
+    axis.text.y = element_text(size = 8),  # Font size for y-axis tick labels
+    plot.caption = element_text(size = 8, hjust = 0),
+    
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor.x = element_blank(), 
+    panel.grid.major.y = element_line(color = "#e5e5e5", size = 0.1),
+    panel.grid.minor.y = element_line(color = "#e5e5e5", size = 0.1)) 
+
+```
+
+```{r}
+
+# 2022-23 Rate Hike Unemployment Peak
+a <- final %>%
+    filter(date >= "2023-08-01") %>%
+    mutate(rate_hike = "'22-'23", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 2015-18 Rate Hike Unemployment Peak
+b <- final %>%
+    filter(date >= "2019-01-01" & date <= "2020-04-01") %>%
+    mutate(rate_hike = "'15-'18", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 2004-06 Rate Hike Unemployment Peak
+c <- final %>%
+    filter(date >= "2006-07-01" & date <= "2009-10-01") %>%
+    mutate(rate_hike = "'04-'06", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 1999-00 Rate Hike Unemployment Peak
+d <- final %>%
+    filter(date >= "2000-06-01" & date <= "2003-06-01") %>%
+    mutate(rate_hike = "'99-'00", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 1994-1995 Rate Hike Unemployment Peak
+e <- final %>%
+    filter(date >= "1995-04-01" & date <= "1995-04-01") %>%
+    mutate(rate_hike = "'94-'95", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 1988-89 Rate Hike Unemployment Peak
+f <- final %>%
+    filter(date >= "1989-03-01" & date <= "1992-06-01") %>%
+    mutate(rate_hike = "'88-'89", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+
+unemployment_peak <- a %>%
+  union(b) %>%
+  union(c) %>%
+  union(d) %>%
+  # union(e) %>%
+  union(f)
+
+```
+
+```{r}
+
+# visualize change in unemployment rate
+ggplot() +
+  
+  geom_line(data = unemployment_peak, aes(x = months_since_pause, y = unemployment_increase, color = rate_hike)) +
+  
+  geom_text(data = unemployment_peak %>% group_by(rate_hike) %>% slice(n()), aes(x = months_since_pause, y = unemployment_increase, color = rate_hike, label = sprintf("%s", rate_hike)), 
+            nudge_y = 0.1, vjust = -0.5, size = 3) +  # Adjust nudge_y and vjust as needed
+  
+  labs(title = "Months to Reach Peak Unemployment", 
+       subtitle = "Increase in Unemployment Rate from Rate Hike Peak, Among Rate Hike Cycles from 1988 to 2023", 
+       y = "Percentage Points", 
+       x = "Months Since Hiking Cycle Peaked", 
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, @mtdunphy") +
+  
+  theme_bw() +
+  
+  guides(color = FALSE) +
+  
+  theme(text = element_text(size = 12),  # Default font size
+    plot.title = element_text(size = 16, face = "bold"),  # Font size and style for the title
+    plot.subtitle = element_text(size = 10),  # Font size for the subtitle
+    axis.title.x = element_text(size = 8),  # Font size for x-axis label
+    axis.title.y = element_text(size = 8),  # Font size for y-axis label
+    axis.text.x = element_text(size = 8),  # Font size for x-axis tick labels
+    axis.text.y = element_text(size = 8),  # Font size for y-axis tick labels
+    plot.caption = element_text(size = 8, hjust = 0),
+    
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor.x = element_blank(), 
+    panel.grid.major.y = element_line(color = "#e5e5e5", size = 0.1),
+    panel.grid.minor.y = element_line(color = "#e5e5e5", size = 0.1)) 
 
 ```
 
