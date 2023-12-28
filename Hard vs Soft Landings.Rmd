@@ -282,7 +282,7 @@ ggplot() +
   
   labs(title = "Unemployment Rate Over Time", 
        subtitle = "From 1958 to 2023", 
-       y = "Unemployment Rate", 
+       y = "Unemployment Rate (%)", 
        x = "", 
        caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, @mtdunphy") +
   
@@ -291,7 +291,7 @@ ggplot() +
   guides(fill = FALSE) +
   
   scale_x_date(breaks = seq(as.Date("1960-01-01"), as.Date("2026-01-01"), by = "5 years"), date_labels = "%Y") +
-  scale_y_continuous(breaks = seq(0, 20, by = 5)) +
+  scale_y_continuous(limits = c(0, 15), breaks = seq(0, 20, by = 5)) +
   
   theme(text = element_text(size = 12),  # Default font size
     plot.title = element_text(size = 16, face = "bold"),  # Font size and style for the title
@@ -345,7 +345,6 @@ f <- final %>%
     filter(date >= "1988-03-01" & date <= "1989-03-01") %>%
     mutate(rate_hike = "'88-'89", months_since_start = row_number() - 1, rate_increase = fed_funds_rate - first(fed_funds_rate))
 
-
 rate_hikes <- a %>%
   union(b) %>%
   union(c) %>%
@@ -395,6 +394,85 @@ ggplot() +
 
 ```{r}
 
+# 2022-23 Rate Hike Recession
+a <- final %>%
+    filter(date >= "2023-08-01") %>%
+    mutate(rate_hike = "'22-'23", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 2015-18 Rate Hike Recession
+b <- final %>%
+    filter(date >= "2019-01-01" & date <= "2020-03-01") %>%
+    mutate(rate_hike = "'15-'18", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 2004-06 Rate Hike Recession
+c <- final %>%
+    filter(date >= "2006-07-01" & date <= "2008-01-01") %>%
+    mutate(rate_hike = "'04-'06", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 1999-00 Rate Hike Recession
+d <- final %>%
+    filter(date >= "2000-06-01" & date <= "2001-04-01") %>%
+    mutate(rate_hike = "'99-'00", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 1994-1995 Rate Hike Recession
+e <- final %>%
+    filter(date >= "1995-04-01" & date <= "1995-04-01") %>%
+    mutate(rate_hike = "'94-'95", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+# 1988-89 Rate Hike Recession
+f <- final %>%
+    filter(date >= "1989-03-01" & date <= "1990-08-01") %>%
+    mutate(rate_hike = "'88-'89", months_since_pause = row_number() - 1, unemployment_increase = unemployment - first(unemployment))
+
+
+recession_start <- a %>%
+  union(b) %>%
+  union(c) %>%
+  union(d) %>%
+  union(e) %>%
+  union(f)
+
+```
+
+```{r}
+
+recession_start$rate_hike <- factor(recession_start$rate_hike, levels = c("'22-'23", "'15-'18", "'04-'06", "'99-'00", "'94-'95", "'88-'89"))
+
+# visualize start of recession
+ggplot() +
+  
+  geom_bar(data = recession_start %>% group_by(rate_hike) %>% slice(n()), aes(x = months_since_pause, y = rate_hike, fill = rate_hike), stat = "identity") +
+  
+  geom_text(data = recession_start %>% group_by(rate_hike) %>% slice(n()), aes(x = months_since_pause + 0.5, y = rate_hike, color = rate_hike, order = rate_hike, label = months_since_pause), nudge_y = 0, vjust = 0.5, size = 3, show.legend = FALSE) +  # Adjust nudge_y and vjust as needed
+  
+  labs(title = "Months to Reach Recession", 
+       subtitle = "Based on NBER Classification, Among Rate Hike Cycles from 1988 to 2023", 
+       y = "Rate Hike Cycle", 
+       x = "Months Since Hiking Cycle Peaked", 
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, @mtdunphy") +
+  
+  theme_bw() +
+  
+  guides(fill = FALSE) +
+  
+  theme(text = element_text(size = 12),  # Default font size
+    plot.title = element_text(size = 16, face = "bold"),  # Font size and style for the title
+    plot.subtitle = element_text(size = 10),  # Font size for the subtitle
+    axis.title.x = element_text(size = 8),  # Font size for x-axis label
+    axis.title.y = element_text(size = 8),  # Font size for y-axis label
+    axis.text.x = element_text(size = 8),  # Font size for x-axis tick labels
+    axis.text.y = element_text(size = 8),  # Font size for y-axis tick labels
+    plot.caption = element_text(size = 8, hjust = 0),
+    
+    panel.grid.major.x = element_line(color = "#e5e5e5", size = 0.1), 
+    panel.grid.minor.x = element_line(color = "#e5e5e5", size = 0.1), 
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank()) 
+
+```
+
+```{r}
+
 # 2022-23 Rate Hike Unemployment Peak
 a <- final %>%
     filter(date >= "2023-08-01") %>%
@@ -430,8 +508,45 @@ unemployment_peak <- a %>%
   union(b) %>%
   union(c) %>%
   union(d) %>%
-  # union(e) %>%
+  union(e) %>%
   union(f)
+
+```
+
+```{r}
+
+unemployment_peak$rate_hike <- factor(unemployment_peak$rate_hike, levels = c("'22-'23", "'15-'18", "'04-'06", "'99-'00", "'94-'95", "'88-'89"))
+
+# visualize unemployment peak as a bar graph
+ggplot() +
+  
+  geom_bar(data = unemployment_peak %>% group_by(rate_hike) %>% slice(n()), aes(x = months_since_pause, y = rate_hike, fill = rate_hike), stat = "identity") +
+  
+  geom_text(data = unemployment_peak %>% group_by(rate_hike) %>% slice(n()), aes(x = months_since_pause + 0.5, y = rate_hike, color = rate_hike, order = rate_hike, label = months_since_pause), nudge_y = 0, vjust = 0.5, size = 3, show.legend = FALSE) +  # Adjust nudge_y and vjust as needed
+  
+  labs(title = "Months to Reach Peak Unemployment", 
+       subtitle = "Among Rate Hike Cycles from 1988 to 2023", 
+       y = "Rate Hike Cycle", 
+       x = "Months Since Hiking Cycle Peaked", 
+       caption = "Source: Federal Reserve Bank of St Louis (FRED) | Visual by Michael Dunphy, @mtdunphy") +
+  
+  theme_bw() +
+  
+  guides(fill = FALSE) +
+  
+  theme(text = element_text(size = 12),  # Default font size
+    plot.title = element_text(size = 16, face = "bold"),  # Font size and style for the title
+    plot.subtitle = element_text(size = 10),  # Font size for the subtitle
+    axis.title.x = element_text(size = 8),  # Font size for x-axis label
+    axis.title.y = element_text(size = 8),  # Font size for y-axis label
+    axis.text.x = element_text(size = 8),  # Font size for x-axis tick labels
+    axis.text.y = element_text(size = 8),  # Font size for y-axis tick labels
+    plot.caption = element_text(size = 8, hjust = 0),
+    
+    panel.grid.major.x = element_line(color = "#e5e5e5", size = 0.1), 
+    panel.grid.minor.x = element_line(color = "#e5e5e5", size = 0.1), 
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank()) 
 
 ```
 
@@ -442,8 +557,7 @@ ggplot() +
   
   geom_line(data = unemployment_peak, aes(x = months_since_pause, y = unemployment_increase, color = rate_hike)) +
   
-  geom_text(data = unemployment_peak %>% group_by(rate_hike) %>% slice(n()), aes(x = months_since_pause, y = unemployment_increase, color = rate_hike, label = sprintf("%s", rate_hike)), 
-            nudge_y = 0.1, vjust = -0.5, size = 3) +  # Adjust nudge_y and vjust as needed
+  geom_text(data = unemployment_peak %>% group_by(rate_hike) %>% slice(n()), aes(x = months_since_pause, y = unemployment_increase, color = rate_hike, order = rate_hike, label = sprintf("%s", rate_hike)), nudge_y = 0.1, vjust = -0.5, size = 3) +  # Adjust nudge_y and vjust as needed
   
   labs(title = "Months to Reach Peak Unemployment", 
        subtitle = "Increase in Unemployment Rate from Rate Hike Peak, Among Rate Hike Cycles from 1988 to 2023", 
